@@ -1,19 +1,15 @@
 import joblib
-import pandas as pd
 from joblib import dump
 from lightgbm import LGBMClassifier
 from sklearn.feature_selection import RFE
-from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
-best_study = joblib.load("optuna/study_LGB.pkl")
-df: pd.DataFrame = joblib.load("data/fraud_dataset_transformed.pkl")
-X = df.drop(columns=['rating'], axis=1)
-y = df['rating'].apply(lambda el: 0 if el == 'OK' else 1)
+best_study = joblib.load("../optuna/study_LGB.pkl")
 
 # impute numerical data with mean values
-X = X.apply(lambda x: x.fillna(x.mean()), axis=0)
-X_TRAIN, X_TEST, Y_TRAIN, Y_TEST = train_test_split(X, y, test_size=0.30, random_state=42)
+
+X_TRAIN = joblib.load('../data/x_train.pkl')
+y_TRAIN = joblib.load('../data/y_train.pkl')
 
 trial = best_study.best_params
 
@@ -39,7 +35,7 @@ subsample = trial["subsample"]
 subsample_freq = trial["bagging_freq"]
 colsample_bytree = trial["colsample_bytree"]
 
-reg = LGBMClassifier(boosting_type=boostingtype,
+clf = LGBMClassifier(boosting_type=boostingtype,
                      num_leaves=num_leaves,
                      learning_rate=learning_rate,
                      n_estimators=n_estimators,
@@ -55,14 +51,11 @@ reg = LGBMClassifier(boosting_type=boostingtype,
                      )
 
 # Recursive Feature elimination in pipeline
-clf = RFE(reg, step=0.02, n_features_to_select=trial["n_features"])
+rec = RFE(clf, step=0.02, n_features_to_select=trial["n_features"])
 pipeline = Pipeline([
-    ('rfe_feature_selection', clf),
+    ('rfe_feature_selection', rec),
     ('clf', clf)
 ])
 
-train = X_TRAIN
-test = Y_TRAIN
-
-pipeline.fit(train, test)
-dump(pipeline, 'lightgbm_model.joblib')
+pipeline.fit(X_TRAIN, y_TRAIN)
+dump(pipeline, '../models/lightgbm_model.joblib')

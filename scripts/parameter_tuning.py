@@ -11,15 +11,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 
 
-def pr_auc(y_true, probas_pred)-> float:
+def pr_auc(y_true, probas_pred) -> float:
     # calculate precision-recall curve
     p, r, _ = precision_recall_curve(y_true, probas_pred)
     # calculate area under curve
     return auc(r, p)
 
+
 def objective(trial):
     boostingtype = 'gbdt'
-    min_child_samples = trial.suggest_categorical('min_child_samples',[5,10, 20, 30, 40, 50, 60 , 70, 80, 90, 100])
+    min_child_samples = trial.suggest_categorical('min_child_samples', [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100])
     num_leaves = trial.suggest_int('num_leaves', 2, 256)
     # learning rate
     learning_rate = trial.suggest_float("eta", 1e-8, 1.0, log=True)
@@ -42,21 +43,20 @@ def objective(trial):
     subsample_freq = trial.suggest_int("bagging_freq", 0, 7)
     colsample_bytree = trial.suggest_float("colsample_bytree", 0.2, 1.0)
 
-
     clf = LGBMClassifier(boosting_type=boostingtype,
-                             num_leaves=num_leaves,
-                             learning_rate=learning_rate,
-                             n_estimators=n_estimators,
-                             min_child_samples=min_child_samples,
-                             max_depth=max_depth,
-                             colsample_bytree=colsample_bytree,
-                             subsample=subsample,
-                             reg_alpha=reg_alpha,
-                             reg_lambda=reg_lambda,
-                             objective=objective,
-                             subsample_freq=subsample_freq,
-                             **params
-                             )
+                         num_leaves=num_leaves,
+                         learning_rate=learning_rate,
+                         n_estimators=n_estimators,
+                         min_child_samples=min_child_samples,
+                         max_depth=max_depth,
+                         colsample_bytree=colsample_bytree,
+                         subsample=subsample,
+                         reg_alpha=reg_alpha,
+                         reg_lambda=reg_lambda,
+                         objective=objective,
+                         subsample_freq=subsample_freq,
+                         **params
+                         )
 
     rfe = RFE(clf, n_features_to_select=n_features, step=0.02)
     pipe = make_pipeline(rfe, clf)
@@ -67,18 +67,22 @@ def objective(trial):
 
 
 if __name__ == '__main__':
-    df: pd.DataFrame = joblib.load("data/fraud_dataset_transformed.pkl")
+    df: pd.DataFrame = joblib.load("../data/fraud_dataset_transformed.pkl")
     X = df.drop(columns=['rating'], axis=1)
     y = df['rating'].apply(lambda el: 0 if el == 'OK' else 1)
 
-    #impute numerical data with mean values
-    X = X.apply(lambda x: x.fillna(x.mean()),axis=0)
+    # impute numerical data with mean values
+    X = X.apply(lambda x: x.fillna(x.mean()), axis=0)
 
-    #conduct traintest split
+    # conduct traintest split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.30, random_state=42)
 
-    #Create Metric for unbalanced class dist
+    joblib.dump(X_train, '../data/x_train.pkl')
+    joblib.dump(y_train, '../data/y_train.pkl')
+    joblib.dump(X_test, '../data/x_test.pkl')
+    joblib.dump(y_test, '../data/y_test.pkl')
+    # Create Metric for unbalanced class dist
     metric = make_scorer(pr_auc, needs_proba=True)
 
     study = optuna.create_study(direction="maximize")
@@ -93,5 +97,5 @@ if __name__ == '__main__':
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
 
-    joblib.dump(study, "optuna/study_LGB.pkl")
-    joblib.dump(trial, "optuna/best_trial_LGB.pkl")
+    joblib.dump(study, "../optuna/study_LGB.pkl")
+    joblib.dump(trial, "../optuna/best_trial_LGB.pkl")
